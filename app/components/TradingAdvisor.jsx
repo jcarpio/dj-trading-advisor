@@ -59,8 +59,8 @@ function extractMetrics(rawData) {
 
 export default function TradingAdvisor() {
   const [massiveKey,   setMassiveKey]   = useState("");
-  const [ticker,       setTicker]       = useState("DJI");
-  const [endpointIdx,  setEndpointIdx]  = useState(0);
+  const [ticker,       setTicker]       = useState("AAPL");
+  const [endpointIdx,  setEndpointIdx]  = useState(2);
   const [status,       setStatus]       = useState("idle");
   const [rawData,      setRawData]      = useState(null);
   const [analysis,     setAnalysis]     = useState("");
