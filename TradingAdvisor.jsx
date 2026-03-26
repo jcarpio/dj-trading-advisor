@@ -59,7 +59,7 @@ function extractMetrics(rawData) {
 
 export default function TradingAdvisor() {
   const [massiveKey,   setMassiveKey]   = useState("");
-  const [ticker,       setTicker]       = useState("YM:CUR");
+  const [ticker,       setTicker]       = useState("DJI");
   const [endpointIdx,  setEndpointIdx]  = useState(0);
   const [status,       setStatus]       = useState("idle");
   const [rawData,      setRawData]      = useState(null);
@@ -168,7 +168,7 @@ Responde en espa√±ol, de forma concisa y profesional. Empieza siempre por la se√
               Ticker
             </label>
             <input value={ticker} onChange={e => setTicker(e.target.value)}
-              placeholder="YM:CUR, DJI, SPY..." style={inputStyle} />
+              placeholder="DJI, SPY, AAPL..." style={inputStyle} />
           </div>
         </div>
 
