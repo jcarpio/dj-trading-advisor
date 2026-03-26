@@ -3,10 +3,10 @@
 import { useState, useCallback } from "react";
 
 const ENDPOINTS = [
-  { label: "Trades",    path: "/v3/trades/{ticker}?limit=20" },
-  { label: "Quotes",    path: "/v3/quotes/{ticker}?limit=20" },
-  { label: "Snapshot",  path: "/v3/snapshot/locale/us/markets/stocks/tickers/{ticker}" },
-  { label: "Dividends", path: "/v3/reference/dividends?ticker={ticker}&limit=10" },
+  { label: "Día anterior", path: "/v2/aggs/ticker/{ticker}/prev" },
+  { label: "Últ. 30 días", path: "/v2/aggs/ticker/{ticker}/range/1/day/2025-01-01/2026-03-26?adjusted=true&sort=desc&limit=30" },
+  { label: "Últ. semana",  path: "/v2/aggs/ticker/{ticker}/range/1/day/2026-03-17/2026-03-26?adjusted=true&sort=desc&limit=7" },
+  { label: "Dividends",    path: "/v3/reference/dividends?ticker={ticker}&limit=10" },
 ];
 
 const SIGNAL_STYLES = {
@@ -60,7 +60,7 @@ function extractMetrics(rawData) {
 export default function TradingAdvisor() {
   const [massiveKey,   setMassiveKey]   = useState("");
   const [ticker,       setTicker]       = useState("AAPL");
-  const [endpointIdx,  setEndpointIdx]  = useState(2);
+  const [endpointIdx,  setEndpointIdx]  = useState(0);
   const [status,       setStatus]       = useState("idle");
   const [rawData,      setRawData]      = useState(null);
   const [analysis,     setAnalysis]     = useState("");
