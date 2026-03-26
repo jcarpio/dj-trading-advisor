@@ -59,8 +59,8 @@ function extractMetrics(rawData) {
 
 export default function TradingAdvisor() {
   const [massiveKey,   setMassiveKey]   = useState("");
-  const [ticker,       setTicker]       = useState("AAPL");
-  const [endpointIdx,  setEndpointIdx]  = useState(0);
+  const [ticker,       setTicker]       = useState("DIA");
+  const [endpointIdx,  setEndpointIdx]  = useState(1);
   const [status,       setStatus]       = useState("idle");
   const [rawData,      setRawData]      = useState(null);
   const [analysis,     setAnalysis]     = useState("");
@@ -91,18 +91,25 @@ export default function TradingAdvisor() {
     setStatus("analyzing");
 
     try {
-      const prompt = `Eres un analista de trading especializado en futuros del Dow Jones y derivados.
-Analiza los siguientes datos de mercado del ticker "${ticker}" y proporciona:
-1. Una señal clara: BUY, SELL o HOLD (en mayúsculas al principio).
-2. Justificación técnica resumida (precio, volumen, tendencia, momentum).
-3. Nivel de confianza (bajo/medio/alto) y por qué.
+      const prompt = `Eres un analista de trading especializado en ETFs que replican el Dow Jones.
+Analiza los siguientes datos históricos del ticker "${ticker}" (últimos 30 días de barras diarias OHLC) y proporciona:
+
+1. Señal clara: BUY, SELL o HOLD (en mayúsculas, al principio de la respuesta).
+2. Análisis técnico completo:
+   - Tendencia general (últimos 30 días)
+   - Media móvil simple de 10 días (SMA10) y 20 días (SMA20) calculadas a mano con los datos
+   - Comparación precio actual vs SMAs (precio por encima o por debajo)
+   - Volumen reciente vs volumen promedio del período
+   - Niveles clave de soporte y resistencia identificados en el histórico
+   - Momentum: ¿está acelerando o frenando?
+3. Nivel de confianza (bajo/medio/alto) con justificación.
 4. Riesgos clave a considerar.
-5. Precio objetivo a corto plazo si aplica.
+5. Precio objetivo a corto plazo (5-10 días) con razonamiento.
 
-Datos de mercado (JSON):
-${JSON.stringify(marketData, null, 2).slice(0, 3000)}
+Datos históricos (JSON con barras diarias - campo 'c'=cierre, 'o'=apertura, 'h'=máximo, 'l'=mínimo, 'v'=volumen, 'vw'=VWAP):
+${JSON.stringify(marketData, null, 2).slice(0, 4000)}
 
-Responde en español, de forma concisa y profesional. Empieza siempre por la señal: BUY / SELL / HOLD.`;
+Responde en español, de forma concisa y profesional. Empieza SIEMPRE con la señal: BUY / SELL / HOLD.`;
 
       const claudeRes = await fetch("/api/analyze", {
         method: "POST",
