@@ -91,6 +91,7 @@ export default function TradingAdvisor() {
     setStatus("analyzing");
 
     try {
+      const isDIA = ticker === "DIA";
       const prompt = `Eres un analista de trading especializado en ETFs que replican el Dow Jones.
 Analiza los siguientes datos históricos del ticker "${ticker}" (últimos 30 días de barras diarias OHLC) y proporciona:
 
@@ -105,6 +106,8 @@ Analiza los siguientes datos históricos del ticker "${ticker}" (últimos 30 dí
 3. Nivel de confianza (bajo/medio/alto) con justificación.
 4. Riesgos clave a considerar.
 5. Precio objetivo a corto plazo (5-10 días) con razonamiento.
+
+${isDIA ? `IMPORTANTE: DIA es el ETF que replica el Dow Jones Industrial Average a razón de 1/100. Por tanto, multiplica todos los precios de DIA × 100 para expresarlos en puntos del Dow Jones. Por ejemplo, DIA $464 = Dow Jones ~46.400 puntos. Incluye siempre la equivalencia en puntos del Dow Jones junto a cada precio relevante.` : ""}
 
 Datos históricos (JSON con barras diarias - campo 'c'=cierre, 'o'=apertura, 'h'=máximo, 'l'=mínimo, 'v'=volumen, 'vw'=VWAP):
 ${JSON.stringify(marketData, null, 2).slice(0, 4000)}
@@ -223,12 +226,15 @@ Responde en español, de forma concisa y profesional. Empieza SIEMPRE con la se�
       {metrics && (
         <div style={{ marginBottom: "1.5rem" }}>
           <p style={{ fontSize: 11, color: "#555", margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            Resumen · {ticker}
+            Resumen · {ticker} {ticker === "DIA" && <span style={{ color: "#4ade80" }}>· equiv. Dow Jones (×100)</span>}
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
-            <MetricCard label="Último" value={`$${metrics.last_price}`} />
-            <MetricCard label="Máximo" value={`$${metrics.high}`} />
-            <MetricCard label="Mínimo" value={`$${metrics.low}`} />
+            <MetricCard label="Último" value={`$${metrics.last_price}`}
+              sub={ticker === "DIA" ? `DJ: ${(parseFloat(metrics.last_price) * 100).toLocaleString("es-ES", {maximumFractionDigits: 0})} pts` : undefined} />
+            <MetricCard label="Máximo" value={`$${metrics.high}`}
+              sub={ticker === "DIA" ? `DJ: ${(parseFloat(metrics.high) * 100).toLocaleString("es-ES", {maximumFractionDigits: 0})} pts` : undefined} />
+            <MetricCard label="Mínimo" value={`$${metrics.low}`}
+              sub={ticker === "DIA" ? `DJ: ${(parseFloat(metrics.low) * 100).toLocaleString("es-ES", {maximumFractionDigits: 0})} pts` : undefined} />
             <MetricCard label="Registros" value={metrics.count}
               sub={metrics.vol > 0 ? `Vol: ${metrics.vol.toLocaleString()}` : undefined} />
           </div>
