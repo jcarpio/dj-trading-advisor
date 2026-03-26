@@ -1,0 +1,121 @@
+DJ Trading Advisor — Historial de cambios
+==========================================
+
+v0.7.0 — 2026-03-27
+--------------------
+NUEVO
+- Feed en tiempo real con análisis de velas en JavaScript (sin llamar a Claude):
+  * Detección de patrones: martillo, estrella fugaz, envolvente alcista/bajista, doji, momentum
+  * Mensaje de tendencia comparando vela actual vs anterior
+  * Alertas de proximidad a niveles de entrada, stop y objetivo (<30 pts)
+  * Mensaje "¡PRECIO EN ZONA DE ENTRADA!" cuando el precio está a <5 pts del nivel
+- Log de eventos con marca de tiempo, scrolleable, hasta 50 entradas
+- Sonido diferenciado: aviso suave al acercarse (warn) vs entrada confirmada (entry) vs objetivo (profit)
+
+MEJORADO
+- Stat de rango de vela (H/L) visible en métricas de precio
+- Triple alerta de entrada: visual parpadeante + sonido + notificación del SO
+- Botón "Limpiar" para el feed de eventos
+
+---
+
+v0.6.0 — 2026-03-27
+--------------------
+NUEVO
+- Arquitectura dual de fuentes de datos:
+  * Massive API para contexto histórico (1W, 1D, 4H) — plan gratuito
+  * Twelve Data API para monitorización en tiempo real 1min — plan gratuito
+- Fase 1: análisis de contexto con Claude (1 sola llamada por sesión, ~$0.004)
+- Fase 2: monitorización automática cada 60s sin llamar a Claude
+- Gestión de riesgo integrada para US30 CFD en MT5 con Funding Pips:
+  * Pérdida máxima diaria: $20 (bloqueo automático)
+  * Objetivo diario: $40 (alerta y sugerencia de cierre)
+  * Máx. 2 operaciones de 0.05 lotes al día
+  * Cuenta atrás de sesión de 30 minutos
+- Registro de operaciones con resultado (TP/SL/Manual) y P&L en USD
+- Conversión automática DIA → US30 en todos los niveles del análisis
+
+CAMBIADO
+- Ticker por defecto: DIA (ETF que replica el Dow Jones a 1/100)
+- Claude recibe instrucciones para dar niveles en puntos US30 enteros
+- Coste total por sesión reducido de ~$0.08 a ~$0.004
+
+---
+
+v0.5.0 — 2026-03-27
+--------------------
+NUEVO
+- Modo automático de análisis cada 60 segundos
+- Grid de estado de los 5 timeframes (1W, 1D, 4H, 30min, 1min) con indicador de carga
+- Triple sistema de alertas: badge parpadeante + Web Audio API + notificación del SO
+- Análisis multi-timeframe: Claude evalúa confluencia entre todos los timeframes
+- Fechas de endpoints dinámicas (ya no hardcodeadas)
+
+CAMBIADO
+- Endpoint por defecto cambiado a "Últ. 30 días" con fechas calculadas automáticamente
+
+---
+
+v0.4.0 — 2026-03-27
+--------------------
+NUEVO
+- Historial de señales guardado en localStorage (hasta 20 entradas)
+- Claude recibe el historial de análisis previos del mismo ticker en cada consulta
+- Claude evalúa si se cumplieron los objetivos de análisis anteriores
+- Panel de historial expandible con señal, precio y fecha
+
+MEJORADO
+- Botón de análisis muestra cuántos análisis previos hay para el ticker actual
+- Endpoint "Últ. 30 días" usa fechas dinámicas calculadas en tiempo real
+
+---
+
+v0.3.0 — 2026-03-27
+--------------------
+NUEVO
+- Equivalencia Dow Jones en puntos para ticker DIA (DIA × 100)
+- Métricas de precio con conversión automática a puntos US30
+- Claude recibe instrucción de expresar precios en puntos DJ cuando el ticker es DIA
+- Endpoints con fechas dinámicas (daysAgo function)
+- Endpoint "Últ. 30 días" como predeterminado
+
+CAMBIADO
+- Ticker por defecto cambiado de AAPL a DIA
+- Prompt de Claude mejorado para análisis técnico con histórico de 30 días:
+  * SMA10 y SMA20 calculadas por Claude con los datos
+  * Soporte y resistencia identificados en el histórico
+  * Precio objetivo a 5-10 días con razonamiento
+
+CORREGIDO
+- Endpoints de Massive corregidos (rutas /v2/aggs en lugar de /v3/snapshot)
+
+---
+
+v0.2.0 — 2026-03-27
+--------------------
+NUEVO
+- Proyecto Next.js 14 completo con estructura App Router
+- API Route /api/analyze como proxy server-side a Claude (la key nunca sale al navegador)
+- Deploy en Vercel con auto-deploy desde GitHub
+- Soporte para variable de entorno ANTHROPIC_API_KEY en Vercel
+- Archivo .env.example y .gitignore correctamente configurados
+- Node.js >=18 requerido en package.json para compatibilidad con Vercel
+
+CORREGIDO
+- Estructura de directorios app/ restaurada correctamente tras subida manual a GitHub
+- Root Directory configurado en Vercel settings
+
+---
+
+v0.1.0 — 2026-03-27
+--------------------
+INICIAL
+- Componente React TradingAdvisor con diseño dark terminal
+- Integración con Massive REST API (dividends, trades, quotes, snapshot)
+- Integración con Claude AI vía API de Anthropic
+- Selector de endpoint y ticker configurable
+- Métricas de precio (último, máximo, mínimo, volumen)
+- Badge de señal BUY/SELL/HOLD con colores semánticos
+- Panel de análisis con texto completo de Claude
+- Visor de JSON raw de Massive (expandible)
+- Prompt especializado en análisis técnico de futuros Dow Jones
