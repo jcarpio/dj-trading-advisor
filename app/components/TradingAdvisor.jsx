@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+
+const HISTORY_KEY = "dj_trading_history";
+const MAX_HISTORY = 20;
 
 const ENDPOINTS = [
   { label: "Día anterior", path: "/v2/aggs/ticker/{ticker}/prev" },
@@ -16,6 +19,16 @@ const SIGNAL_STYLES = {
   "N/A":{ bg: "#1a1a1a", text: "#888",    border: "#333" },
 };
 
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); }
+  catch { return []; }
+}
+
+function saveHistory(history) {
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, MAX_HISTORY))); }
+  catch {}
+}
+
 function MetricCard({ label, value, sub }) {
   return (
     <div style={{
@@ -24,17 +37,18 @@ function MetricCard({ label, value, sub }) {
     }}>
       <span style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</span>
       <span style={{ fontSize: 20, fontWeight: 500, fontFamily: "monospace" }}>{value}</span>
-      {sub && <span style={{ fontSize: 11, color: "#555" }}>{sub}</span>}
+      {sub && <span style={{ fontSize: 11, color: "#4ade80" }}>{sub}</span>}
     </div>
   );
 }
 
-function SignalBadge({ signal }) {
+function SignalBadge({ signal, size = "md" }) {
   const s = SIGNAL_STYLES[signal] || SIGNAL_STYLES["N/A"];
   return (
     <span style={{
       background: s.bg, color: s.text, border: `0.5px solid ${s.border}`,
-      borderRadius: 8, padding: "4px 16px", fontSize: 13, fontWeight: 600,
+      borderRadius: 6, padding: size === "sm" ? "2px 8px" : "4px 16px",
+      fontSize: size === "sm" ? 11 : 13, fontWeight: 600,
       letterSpacing: "0.08em", fontFamily: "monospace",
     }}>{signal}</span>
   );
@@ -57,18 +71,97 @@ function extractMetrics(rawData) {
   return { last_price, high, low, vol, count: results.length };
 }
 
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function HistoryPanel({ history, onClear }) {
+  const [expanded, setExpanded] = useState(null);
+
+  if (history.length === 0) return (
+    <div style={{ borderTop: "0.5px solid #1a1a1a", paddingTop: "1.5rem", marginTop: "1rem" }}>
+      <p style={{ fontSize: 11, color: "#444", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 8px" }}>
+        Historial de señales
+      </p>
+      <p style={{ fontSize: 13, color: "#444", margin: 0 }}>Aún no hay análisis guardados. El historial aparecerá aquí tras el primer análisis.</p>
+    </div>
+  );
+
+  return (
+    <div style={{ borderTop: "0.5px solid #1a1a1a", paddingTop: "1.5rem", marginTop: "1rem" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <p style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>
+          Historial de señales · {history.length} análisis guardados
+        </p>
+        <button onClick={onClear} style={{
+          fontSize: 11, padding: "3px 10px", cursor: "pointer", borderRadius: 6,
+          background: "transparent", color: "#555", border: "0.5px solid #2a2a2a",
+        }}>Borrar historial</button>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {history.map((entry, i) => (
+          <div key={entry.id} style={{
+            background: "#111", border: "0.5px solid #1e1e1e", borderRadius: 8, overflow: "hidden",
+          }}>
+            <div
+              onClick={() => setExpanded(expanded === i ? null : i)}
+              style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", cursor: "pointer" }}
+            >
+              <SignalBadge signal={entry.signal} size="sm" />
+              <span style={{ fontFamily: "monospace", fontSize: 12, color: "#888", flex: 1 }}>{entry.ticker}</span>
+              <span style={{ fontFamily: "monospace", fontSize: 12, color: "#555" }}>
+                ${entry.price}
+                {entry.ticker === "DIA" && (
+                  <span style={{ color: "#4ade80", marginLeft: 6 }}>
+                    DJ {(parseFloat(entry.price) * 100).toLocaleString("es-ES", { maximumFractionDigits: 0 })} pts
+                  </span>
+                )}
+              </span>
+              <span style={{ fontSize: 11, color: "#444" }}>{formatDate(entry.date)}</span>
+              <span style={{ fontSize: 11, color: "#333" }}>{expanded === i ? "▲" : "▼"}</span>
+            </div>
+
+            {expanded === i && (
+              <div style={{ borderTop: "0.5px solid #1a1a1a", padding: "12px 14px" }}>
+                {entry.target && (
+                  <p style={{ fontSize: 12, color: "#4ade80", margin: "0 0 8px", fontFamily: "monospace" }}>
+                    Precio objetivo: {entry.target}
+                    {entry.ticker === "DIA" && entry.target && (
+                      <span style={{ color: "#555", marginLeft: 8 }}>
+                        (DJ ~{(parseFloat(entry.target.replace("$","")) * 100).toLocaleString("es-ES",{maximumFractionDigits:0})} pts)
+                      </span>
+                    )}
+                  </p>
+                )}
+                <p style={{ fontSize: 12, lineHeight: 1.7, color: "#555", margin: 0, whiteSpace: "pre-wrap" }}>
+                  {entry.summary}
+                </p>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function TradingAdvisor() {
-  const [massiveKey,   setMassiveKey]   = useState("");
-  const [ticker,       setTicker]       = useState("DIA");
-  const [endpointIdx,  setEndpointIdx]  = useState(1);
-  const [status,       setStatus]       = useState("idle");
-  const [rawData,      setRawData]      = useState(null);
-  const [analysis,     setAnalysis]     = useState("");
-  const [signal,       setSignal]       = useState("N/A");
-  const [error,        setError]        = useState("");
+  const [massiveKey,  setMassiveKey]  = useState("");
+  const [ticker,      setTicker]      = useState("DIA");
+  const [endpointIdx, setEndpointIdx] = useState(1);
+  const [status,      setStatus]      = useState("idle");
+  const [rawData,     setRawData]     = useState(null);
+  const [analysis,    setAnalysis]    = useState("");
+  const [signal,      setSignal]      = useState("N/A");
+  const [error,       setError]       = useState("");
+  const [history,     setHistory]     = useState([]);
+
+  useEffect(() => { setHistory(loadHistory()); }, []);
 
   const selectedEndpoint = ENDPOINTS[endpointIdx];
   const resolvedPath     = selectedEndpoint.path.replace("{ticker}", encodeURIComponent(ticker));
+  const prevForTicker    = history.filter(h => h.ticker === ticker).length;
 
   const run = useCallback(async () => {
     if (!massiveKey.trim()) { setError("Introduce tu API key de Massive."); return; }
@@ -91,28 +184,43 @@ export default function TradingAdvisor() {
     setStatus("analyzing");
 
     try {
+      const currentHistory = loadHistory();
+      const recentForTicker = currentHistory.filter(h => h.ticker === ticker).slice(0, 5);
+
+      const historyContext = recentForTicker.length > 0
+        ? `\n\nHISTORIAL DE ANÁLISIS PREVIOS (más reciente primero):
+${recentForTicker.map(h =>
+  `- ${formatDate(h.date)}: Señal ${h.signal}, precio $${h.price}${h.ticker === "DIA" ? ` (DJ ~${(parseFloat(h.price)*100).toLocaleString("es-ES",{maximumFractionDigits:0})} pts)` : ""}, objetivo: ${h.target || "no especificado"}.`
+).join("\n")}
+
+Con este historial evalúa también:
+- ¿Se cumplieron las predicciones de precio objetivo anteriores?
+- ¿Ha cambiado la tendencia respecto a análisis previos?
+- ¿Hay consistencia o divergencia entre señales pasadas y situación actual?`
+        : "";
+
       const isDIA = ticker === "DIA";
       const prompt = `Eres un analista de trading especializado en ETFs que replican el Dow Jones.
 Analiza los siguientes datos históricos del ticker "${ticker}" (últimos 30 días de barras diarias OHLC) y proporciona:
 
 1. Señal clara: BUY, SELL o HOLD (en mayúsculas, al principio de la respuesta).
-2. Análisis técnico completo:
+2. Análisis técnico:
    - Tendencia general (últimos 30 días)
-   - Media móvil simple de 10 días (SMA10) y 20 días (SMA20) calculadas a mano con los datos
-   - Comparación precio actual vs SMAs (precio por encima o por debajo)
-   - Volumen reciente vs volumen promedio del período
-   - Niveles clave de soporte y resistencia identificados en el histórico
-   - Momentum: ¿está acelerando o frenando?
+   - SMA10 y SMA20 calculadas con los datos
+   - Precio actual vs SMAs
+   - Volumen reciente vs promedio del período
+   - Soporte y resistencia clave
+   - Momentum
 3. Nivel de confianza (bajo/medio/alto) con justificación.
-4. Riesgos clave a considerar.
-5. Precio objetivo a corto plazo (5-10 días) con razonamiento.
+4. Riesgos clave.
+5. Precio objetivo a 5-10 días — incluye el valor en formato "$XXX.XX".
+${historyContext}
+${isDIA ? `\nIMPORTANTE: DIA replica el Dow Jones a razón de 1/100. Multiplica precios × 100 para puntos del DJ. Ej: $464 = ~46.400 pts.` : ""}
 
-${isDIA ? `IMPORTANTE: DIA es el ETF que replica el Dow Jones Industrial Average a razón de 1/100. Por tanto, multiplica todos los precios de DIA × 100 para expresarlos en puntos del Dow Jones. Por ejemplo, DIA $464 = Dow Jones ~46.400 puntos. Incluye siempre la equivalencia en puntos del Dow Jones junto a cada precio relevante.` : ""}
-
-Datos históricos (JSON con barras diarias - campo 'c'=cierre, 'o'=apertura, 'h'=máximo, 'l'=mínimo, 'v'=volumen, 'vw'=VWAP):
+Datos (JSON - 'c'=cierre, 'o'=apertura, 'h'=máximo, 'l'=mínimo, 'v'=volumen, 'vw'=VWAP):
 ${JSON.stringify(marketData, null, 2).slice(0, 4000)}
 
-Responde en español, de forma concisa y profesional. Empieza SIEMPRE con la señal: BUY / SELL / HOLD.`;
+Responde en español, conciso y profesional. Empieza SIEMPRE con: BUY / SELL / HOLD.`;
 
       const claudeRes = await fetch("/api/analyze", {
         method: "POST",
@@ -123,14 +231,40 @@ Responde en español, de forma concisa y profesional. Empieza SIEMPRE con la se�
       const claudeData = await claudeRes.json();
       if (claudeData.error) throw new Error(claudeData.error);
       const text = claudeData?.content?.map(b => b.text || "").join("") || "Sin respuesta.";
+      const detectedSignal = extractSignal(text);
+
       setAnalysis(text);
-      setSignal(extractSignal(text));
+      setSignal(detectedSignal);
       setStatus("done");
+
+      const metrics = extractMetrics(marketData);
+      const targetMatches = text.match(/\$\d{3,4}(?:\.\d{1,2})?/g);
+      const target = targetMatches ? targetMatches[targetMatches.length - 1] : null;
+
+      const newEntry = {
+        id: Date.now(),
+        date: new Date().toISOString(),
+        ticker,
+        signal: detectedSignal,
+        price: metrics?.last_price || "—",
+        target,
+        summary: text.slice(0, 500),
+      };
+
+      const updated = [newEntry, ...currentHistory];
+      saveHistory(updated);
+      setHistory(updated.slice(0, MAX_HISTORY));
+
     } catch (e) {
       setError(`Error al consultar Claude: ${e.message}`);
       setStatus("done");
     }
   }, [massiveKey, ticker, resolvedPath]);
+
+  const handleClearHistory = () => {
+    localStorage.removeItem(HISTORY_KEY);
+    setHistory([]);
+  };
 
   const metrics = rawData ? extractMetrics(rawData) : null;
   const busy    = status === "fetching" || status === "analyzing";
@@ -159,7 +293,7 @@ Responde en español, de forma concisa y profesional. Empieza SIEMPRE con la se�
           <SignalBadge signal={signal} />
         </div>
         <p style={{ margin: 0, fontSize: 13, color: "#555" }}>
-          Datos de mercado vía Massive API · Análisis por Claude AI
+          Datos de mercado vía Massive API · Análisis por Claude AI · Historial local
         </p>
       </div>
 
@@ -178,7 +312,7 @@ Responde en español, de forma concisa y profesional. Empieza SIEMPRE con la se�
               Ticker
             </label>
             <input value={ticker} onChange={e => setTicker(e.target.value)}
-              placeholder="DJI, SPY, AAPL..." style={inputStyle} />
+              placeholder="DIA, SPY, AAPL..." style={inputStyle} />
           </div>
         </div>
 
@@ -205,20 +339,15 @@ Responde en español, de forma concisa y profesional. Empieza SIEMPRE con la se�
           }}>{error}</div>
         )}
 
-        <button
-          onClick={run}
-          disabled={busy}
-          style={{
-            width: "100%", padding: "10px", fontSize: 14, cursor: busy ? "not-allowed" : "pointer",
-            background: busy ? "#1a1a1a" : "#0d2e1a", color: busy ? "#555" : "#4ade80",
-            border: `0.5px solid ${busy ? "#2a2a2a" : "#166534"}`,
-            borderRadius: 8, fontFamily: "monospace", fontWeight: 500,
-            transition: "all 0.15s",
-          }}
-        >
+        <button onClick={run} disabled={busy} style={{
+          width: "100%", padding: "10px", fontSize: 14, cursor: busy ? "not-allowed" : "pointer",
+          background: busy ? "#1a1a1a" : "#0d2e1a", color: busy ? "#555" : "#4ade80",
+          border: `0.5px solid ${busy ? "#2a2a2a" : "#166534"}`,
+          borderRadius: 8, fontFamily: "monospace", fontWeight: 500, transition: "all 0.15s",
+        }}>
           {status === "fetching" ? "⟳ Obteniendo datos de Massive..." :
            status === "analyzing" ? "⟳ Analizando con Claude..." :
-           "▶ Obtener datos y analizar"}
+           `▶ Obtener datos y analizar${prevForTicker > 0 ? ` · ${prevForTicker} análisis previos de ${ticker}` : ""}`}
         </button>
       </div>
 
@@ -226,15 +355,15 @@ Responde en español, de forma concisa y profesional. Empieza SIEMPRE con la se�
       {metrics && (
         <div style={{ marginBottom: "1.5rem" }}>
           <p style={{ fontSize: 11, color: "#555", margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            Resumen · {ticker} {ticker === "DIA" && <span style={{ color: "#4ade80" }}>· equiv. Dow Jones (×100)</span>}
+            Resumen · {ticker}{ticker === "DIA" && <span style={{ color: "#4ade80" }}> · equiv. Dow Jones (×100)</span>}
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
             <MetricCard label="Último" value={`$${metrics.last_price}`}
-              sub={ticker === "DIA" ? `DJ: ${(parseFloat(metrics.last_price) * 100).toLocaleString("es-ES", {maximumFractionDigits: 0})} pts` : undefined} />
+              sub={ticker === "DIA" ? `DJ: ${(parseFloat(metrics.last_price)*100).toLocaleString("es-ES",{maximumFractionDigits:0})} pts` : undefined} />
             <MetricCard label="Máximo" value={`$${metrics.high}`}
-              sub={ticker === "DIA" ? `DJ: ${(parseFloat(metrics.high) * 100).toLocaleString("es-ES", {maximumFractionDigits: 0})} pts` : undefined} />
+              sub={ticker === "DIA" ? `DJ: ${(parseFloat(metrics.high)*100).toLocaleString("es-ES",{maximumFractionDigits:0})} pts` : undefined} />
             <MetricCard label="Mínimo" value={`$${metrics.low}`}
-              sub={ticker === "DIA" ? `DJ: ${(parseFloat(metrics.low) * 100).toLocaleString("es-ES", {maximumFractionDigits: 0})} pts` : undefined} />
+              sub={ticker === "DIA" ? `DJ: ${(parseFloat(metrics.low)*100).toLocaleString("es-ES",{maximumFractionDigits:0})} pts` : undefined} />
             <MetricCard label="Registros" value={metrics.count}
               sub={metrics.vol > 0 ? `Vol: ${metrics.vol.toLocaleString()}` : undefined} />
           </div>
@@ -263,8 +392,8 @@ Responde en español, de forma concisa y profesional. Empieza SIEMPRE con la se�
 
       {/* Raw JSON */}
       {rawData && (
-        <details style={{ marginTop: "1rem" }}>
-          <summary style={{ fontSize: 12, color: "#555", cursor: "pointer", userSelect: "none" }}>
+        <details>
+          <summary style={{ fontSize: 12, color: "#444", cursor: "pointer", userSelect: "none" }}>
             Ver JSON completo de Massive
           </summary>
           <pre style={{
@@ -275,6 +404,9 @@ Responde en español, de forma concisa y profesional. Empieza SIEMPRE con la se�
           }}>{JSON.stringify(rawData, null, 2)}</pre>
         </details>
       )}
+
+      {/* History */}
+      <HistoryPanel history={history} onClear={handleClearHistory} />
 
       <p style={{ marginTop: "2rem", fontSize: 11, color: "#333", textAlign: "center" }}>
         Este análisis no constituye asesoramiento financiero.
