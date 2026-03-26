@@ -5,10 +5,17 @@ import { useState, useCallback, useEffect } from "react";
 const HISTORY_KEY = "dj_trading_history";
 const MAX_HISTORY = 20;
 
+function daysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+const TODAY = new Date().toISOString().slice(0, 10);
+
 const ENDPOINTS = [
+  { label: "Últ. 30 días", path: `/v2/aggs/ticker/{ticker}/range/1/day/${daysAgo(30)}/${TODAY}?adjusted=true&sort=asc&limit=30` },
+  { label: "Últ. semana",  path: `/v2/aggs/ticker/{ticker}/range/1/day/${daysAgo(7)}/${TODAY}?adjusted=true&sort=asc&limit=7` },
   { label: "Día anterior", path: "/v2/aggs/ticker/{ticker}/prev" },
-  { label: "Últ. 30 días", path: "/v2/aggs/ticker/{ticker}/range/1/day/2025-01-01/2026-03-26?adjusted=true&sort=desc&limit=30" },
-  { label: "Últ. semana",  path: "/v2/aggs/ticker/{ticker}/range/1/day/2026-03-17/2026-03-26?adjusted=true&sort=desc&limit=7" },
   { label: "Dividends",    path: "/v3/reference/dividends?ticker={ticker}&limit=10" },
 ];
 
@@ -149,7 +156,7 @@ function HistoryPanel({ history, onClear }) {
 export default function TradingAdvisor() {
   const [massiveKey,  setMassiveKey]  = useState("");
   const [ticker,      setTicker]      = useState("DIA");
-  const [endpointIdx, setEndpointIdx] = useState(1);
+  const [endpointIdx, setEndpointIdx] = useState(0);
   const [status,      setStatus]      = useState("idle");
   const [rawData,     setRawData]     = useState(null);
   const [analysis,    setAnalysis]    = useState("");
