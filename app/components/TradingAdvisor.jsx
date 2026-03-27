@@ -462,44 +462,27 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
     setPollCount(0);
     setPhase("monitoring");
     setNextPoll(60);
-    setLog(prev => [{ type: "info", icon: "▶", text: "Monitorización iniciada. Actualizando cada 60s desde Twelve Data.", time: new Date().toLocaleTimeString("es-ES") }, ...prev]);
+    setLog(prev => [{ type: "info", icon: "▶", text: "Monitorización iniciada. Actualizando cada 60s desde IBKR Bridge (localhost:3001).", time: new Date().toLocaleTimeString("es-ES") }, ...prev]);
 
     const poll = async () => {
       try {
         // Intenta IBKR Bridge primero (datos reales YM)
-        // El bridge corre en localhost:3001 en el Mac del usuario
-        let us30, high, low, volume, timeStr;
-        let sourceLabel = "IBKR";
+        // Obtener precio desde IBKR Bridge (localhost:3001)
+        // Requiere que "node server.js" esté corriendo en ~/ibkr-bridge
+        const ibRes  = await fetch("http://localhost:3001/price?symbol=YM", { signal: AbortSignal.timeout(10000) });
+        const ibData = await ibRes.json();
 
-        try {
-          const ibRes  = await fetch("http://localhost:3001/price?symbol=YM", { signal: AbortSignal.timeout(8000) });
-          const ibData = await ibRes.json();
-          if (ibData.last && ibData.last > 0) {
-            us30      = Math.round(ibData.last);
-            high      = Math.round(ibData.high  || ibData.last);
-            low       = Math.round(ibData.low   || ibData.last);
-            volume    = ibData.volume || 0;
-            timeStr   = ibData.time  || new Date().toISOString();
-          } else {
-            throw new Error("Sin precio IBKR");
-          }
-        } catch {
-          // Fallback a Twelve Data si el bridge no está disponible
-          sourceLabel = "Twelve Data";
-          const url  = tdUrl(ticker, "1min", 10, tdKey);
-          const res  = await fetch(url);
-          const data = await res.json();
-          if (data.status === "error") throw new Error(data.message || "Error Twelve Data");
-          const bars   = data.values || [];
-          const latest = bars[0];
-          if (!latest) return;
-          const closeVal = parseFloat(latest.close || latest.Close || 0);
-          us30    = diaToUS30(closeVal);
-          high    = diaToUS30(parseFloat(latest.high   || closeVal));
-          low     = diaToUS30(parseFloat(latest.low    || closeVal));
-          volume  = parseInt(latest.volume || 0);
-          timeStr = latest.datetime || latest.date || new Date().toISOString();
+        if (!ibData.last || ibData.last <= 0) {
+          addLog({ type: "danger", icon: "✗", text: "IBKR Bridge no responde. Asegúrate de que 'node server.js' está corriendo en ~/ibkr-bridge" });
+          return;
         }
+
+        const us30      = Math.round(ibData.last);
+        const high      = Math.round(ibData.high   || ibData.last);
+        const low       = Math.round(ibData.low    || ibData.last);
+        const volume    = ibData.volume || 0;
+        const timeStr   = ibData.time   || new Date().toISOString();
+        const sourceLabel = "IBKR";
 
         const prev = prevRef.current;
 
@@ -611,7 +594,7 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
           )}
         </div>
         <p style={{ margin: 0, fontSize: 10, color: "#444" }}>
-          Contexto: Massive (1W·1D·4H) · Tiempo real: Twelve Data (1min) · US30 CFD · MT5
+          Contexto: Massive (1W·1D·4H) · Tiempo real: IBKR Bridge (YM) · US30 CFD · MT5
         </p>
       </div>
 
