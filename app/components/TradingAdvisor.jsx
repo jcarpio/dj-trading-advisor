@@ -362,7 +362,7 @@ export default function TradingAdvisor() {
     const tfs = [
       { id: "1W", path: `/v2/aggs/ticker/${ticker}/range/1/week/${daysAgo(84)}/${TODAY}?adjusted=true&sort=asc&limit=12` },
       { id: "1D", path: `/v2/aggs/ticker/${ticker}/range/1/day/${daysAgo(30)}/${TODAY}?adjusted=true&sort=asc&limit=30` },
-      { id: "4H", path: `/v2/aggs/ticker/${ticker}/range/4/hour/${daysAgo(5)}/${TODAY}?adjusted=true&sort=asc&limit=30` },
+      { id: "4H", path: `/v2/aggs/ticker/${ticker}/range/4/hour/${daysAgo(3)}/${TODAY}?adjusted=true&sort=asc&limit=20` },
     ];
 
     const tfData = {};
