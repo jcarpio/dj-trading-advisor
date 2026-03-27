@@ -513,7 +513,7 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
         // Base poll entry
         entries.push({
           type: "poll", icon: "📡",
-          text: `US30 ${us30.toLocaleString()} pts · H:${high} L:${low} · Vol:${parseInt(latest.volume||0).toLocaleString()} · ${formatTime(latest.datetime || new Date().toISOString())}`
+          text: `US30 ${us30.toLocaleString()} pts · H:${high} L:${low} · Vol:${(volume||0).toLocaleString()} · ${sourceLabel} · ${formatTime(timeStr)}`
         });
 
         // Trend vs previous
