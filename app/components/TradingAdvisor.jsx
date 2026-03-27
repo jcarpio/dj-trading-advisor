@@ -493,12 +493,12 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
           const bars   = data.values || [];
           const latest = bars[0];
           if (!latest) return;
-          const close = parseFloat(latest.close) || 0;
-          us30    = diaToUS30(close);
-          high    = diaToUS30(parseFloat(latest.high)  || close);
-          low     = diaToUS30(parseFloat(latest.low)   || close);
+          const closeVal = parseFloat(latest.close || latest.Close || 0);
+          us30    = diaToUS30(closeVal);
+          high    = diaToUS30(parseFloat(latest.high   || closeVal));
+          low     = diaToUS30(parseFloat(latest.low    || closeVal));
           volume  = parseInt(latest.volume || 0);
-          timeStr = latest.datetime || new Date().toISOString();
+          timeStr = latest.datetime || latest.date || new Date().toISOString();
         }
 
         const prev = prevRef.current;
@@ -513,7 +513,7 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
         // Base poll entry
         entries.push({
           type: "poll", icon: "📡",
-          text: `US30 ${us30.toLocaleString()} pts · DIA $${close.toFixed(2)} · H:${high} L:${low} · Vol:${parseInt(latest.volume||0).toLocaleString()} · ${formatTime(latest.datetime)}`
+          text: `US30 ${us30.toLocaleString()} pts · H:${high} L:${low} · Vol:${parseInt(latest.volume||0).toLocaleString()} · ${formatTime(latest.datetime || new Date().toISOString())}`
         });
 
         // Trend vs previous
@@ -696,7 +696,7 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
         <div style={{ marginBottom: "0.9rem" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 6 }}>
             <Stat label="US30 equiv." value={`${livePrice.us30.toLocaleString()}`} color="#4ade80" sub="puntos" />
-            <Stat label="DIA precio"  value={`$${livePrice.dia}`} />
+            <Stat label="Vol. YM"     value={livePrice.volume ? livePrice.volume.toLocaleString() : "—"} />
             <Stat label="Rango vela"  value={`${livePrice.low}–${livePrice.high}`} color="#888" />
             <Stat label="Última vela" value={formatTime(livePrice.time)} color="#555" />
           </div>
