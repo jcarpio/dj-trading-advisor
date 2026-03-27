@@ -466,22 +466,44 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
 
     const poll = async () => {
       try {
-        const url  = tdUrl(ticker, "1min", 10, tdKey);
-        const res  = await fetch(url);
-        const data = await res.json();
-        if (data.status === "error") throw new Error(data.message || "Error Twelve Data");
+        // Intenta IBKR Bridge primero (datos reales YM)
+        // El bridge corre en localhost:3001 en el Mac del usuario
+        let us30, high, low, volume, timeStr;
+        let sourceLabel = "IBKR";
 
-        const bars   = data.values || [];
-        const latest = bars[0];
-        if (!latest) return;
+        try {
+          const ibRes  = await fetch("http://localhost:3001/price?symbol=YM", { signal: AbortSignal.timeout(8000) });
+          const ibData = await ibRes.json();
+          if (ibData.last && ibData.last > 0) {
+            us30      = Math.round(ibData.last);
+            high      = Math.round(ibData.high  || ibData.last);
+            low       = Math.round(ibData.low   || ibData.last);
+            volume    = ibData.volume || 0;
+            timeStr   = ibData.time  || new Date().toISOString();
+          } else {
+            throw new Error("Sin precio IBKR");
+          }
+        } catch {
+          // Fallback a Twelve Data si el bridge no está disponible
+          sourceLabel = "Twelve Data";
+          const url  = tdUrl(ticker, "1min", 10, tdKey);
+          const res  = await fetch(url);
+          const data = await res.json();
+          if (data.status === "error") throw new Error(data.message || "Error Twelve Data");
+          const bars   = data.values || [];
+          const latest = bars[0];
+          if (!latest) return;
+          const close = parseFloat(latest.close);
+          us30    = diaToUS30(close);
+          high    = diaToUS30(parseFloat(latest.high));
+          low     = diaToUS30(parseFloat(latest.low));
+          volume  = parseInt(latest.volume || 0);
+          timeStr = latest.datetime;
+        }
 
-        const close  = parseFloat(latest.close);
-        const us30   = diaToUS30(close);
-        const high   = diaToUS30(parseFloat(latest.high));
-        const low    = diaToUS30(parseFloat(latest.low));
-        const prev   = prevRef.current;
+        const prev = prevRef.current;
 
-        setLivePrice({ dia: close.toFixed(2), us30, high, low, time: latest.datetime, volume: latest.volume });
+        setLivePrice({ us30, high, low, time: timeStr, volume, source: sourceLabel });
         setPrevUS30(prev);
         prevRef.current = us30;
         setPollCount(p => p + 1);
