@@ -493,12 +493,12 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
           const bars   = data.values || [];
           const latest = bars[0];
           if (!latest) return;
-          const close = parseFloat(latest.close);
+          const close = parseFloat(latest.close) || 0;
           us30    = diaToUS30(close);
-          high    = diaToUS30(parseFloat(latest.high));
-          low     = diaToUS30(parseFloat(latest.low));
+          high    = diaToUS30(parseFloat(latest.high)  || close);
+          low     = diaToUS30(parseFloat(latest.low)   || close);
           volume  = parseInt(latest.volume || 0);
-          timeStr = latest.datetime;
+          timeStr = latest.datetime || new Date().toISOString();
         }
 
         const prev = prevRef.current;
