@@ -196,3 +196,31 @@ FLUJO DIARIO DE USO
 3. Abrir app en Vercel → Analizar contexto → Iniciar monitorización
 4. Esperar señal → ejecutar manualmente en Funding Pips MT5
 5. Registrar resultado (TP/SL/Manual) en la app
+
+---
+
+v1.0.0 — 2026-03-28
+--------------------
+NUEVO
+- Botón "🔄 Re-analizar con precio actual IBKR" — visible siempre tras el análisis inicial
+- Historial de 100 precios IBKR (buffer circular, poll cada 20s = ~33 min de datos intraday)
+- Re-análisis incluye resumen del historial: rango, tendencia, últimos 20 precios
+- Precio IBKR en tiempo real incluido también en el análisis inicial (Fase 1)
+- Timeframe 1H en Massive (antes 4H que fallaba) — 24 barras horarias de últimas 48h
+- Stat "Historial · N/100" en la barra de métricas — verde cuando hay 10+ precios
+
+MENSAJES DE ERROR MEJORADOS
+- Bridge responde sin precio → "🕐 Mercado cerrado · Último H:X L:X · Reabre domingo 23:00 Madrid"
+- Timeout → "🕐 Mercado cerrado · Bridge conectado pero sin precio activo"
+- Bridge no corre → "✗ IBKR Bridge no responde. Asegúrate de que 'node server.js' está corriendo"
+
+CONFIGURACIÓN IBKR COMPLETADA
+- Market Data API Acknowledgement firmado (2026-03-28)
+- Suscripción CBOT Real-Time resuscrita tras activación 2FA con Authy
+- Flujo de login: IB Gateway → usuario/contraseña → código Authy (6 dígitos)
+- Comando arranque seguro: caffeinate -i node server.js (evita reposo del Mac)
+
+CORRECCIONES
+- Memory leak de event listeners en getPrice() — listeners eliminados con removeListener()
+- CORS headers mejorados en bridge — permite peticiones desde cualquier origen
+- Resolución de precio: 500ms tras primer tick con last en lugar de esperar tickSnapshotEnd

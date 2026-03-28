@@ -2,6 +2,8 @@
 
 Asistente de trading para el índice Dow Jones (US30 CFD / YM futuros) con análisis multi-timeframe por IA, monitorización en tiempo real vía IBKR y gestión de riesgo integrada.
 
+**Versión:** 1.0.0 · **Coste mensual:** ~$1.63 · **Deploy:** Vercel (auto-deploy desde GitHub)
+
 ---
 
 ## ¿Qué hace esta app?
@@ -11,38 +13,44 @@ Combina datos históricos de Massive API, precio en tiempo real de Interactive B
 ### Flujo de sesión (máx. 30 minutos al día)
 
 **Fase 1 — Contexto macro (1 llamada a Claude, ~$0.004)**
-- Obtiene datos históricos de **Massive API**: 1W + 1D + 4H
-- Claude analiza tendencia, soporte/resistencia y devuelve:
-  - Señal: BUY / SELL / HOLD
-  - Nivel de entrada, stop loss y take profit en puntos US30
-  - Condición exacta de entrada en vela de 1 minuto
+- Obtiene datos de **Massive API**: 1W + 1D + 1H
+- Consulta precio actual del YM desde **IBKR Bridge**
+- Claude analiza todo y devuelve señal BUY/SELL/HOLD con entrada, SL y TP
 
-**Fase 2 — Monitorización en tiempo real (0 llamadas a Claude)**
-- **IBKR Bridge** consulta precio del YM cada 20 segundos
-- JavaScript detecta localmente:
-  - Proximidad a niveles de entrada/stop/objetivo (<30 pts)
-  - Tendencia del precio vs señal de contexto
-  - Triple alerta cuando se alcanza la condición: visual + sonido + notificación SO
+**Fase 1b — Re-análisis rápido (botón 🔄)**
+- Usa el análisis previo + precio actual IBKR + historial de hasta 100 precios recientes
+- Detecta cambios de momentum intraday sin repetir la consulta a Massive
+- Ideal cuando el precio se ha movido significativamente desde el análisis inicial
+
+**Fase 2 — Monitorización en tiempo real**
+- IBKR Bridge consulta precio del YM cada 20 segundos
+- Buffer circular de 100 precios (~33 minutos de historial intraday)
+- Alertas de proximidad a niveles de entrada/stop/objetivo (<30 pts)
+- Triple alerta cuando se alcanza la condición: visual + sonido + notificación SO
 
 **Gestión de riesgo automática**
 - Pérdida máxima diaria: $20 → bloquea la sesión
 - Objetivo diario: $40 → avisa y sugiere cerrar
 - Máximo 2 operaciones al día
-- Cuenta atrás de 30 minutos
+- Cuenta atrás de 30 minutos por sesión
 
 ---
 
-## Stack
+## Stack técnico
 
-- **Next.js 14** (App Router)
-- **Massive REST API** — datos históricos gratuitos (1W, 1D, 4H)
-- **IBKR Bridge** — servidor Node.js local que conecta con IB Gateway (precio real YM cada 20s)
-- **Claude AI (claude-sonnet-4)** — análisis de contexto, 1 llamada por sesión
-- **Vercel** — deploy automático desde GitHub en cada push a main
+| Componente | Tecnología | Coste |
+|---|---|---|
+| Frontend | Next.js 14 App Router | $0 |
+| Datos históricos | Massive REST API (1W, 1D, 1H) | $0 |
+| Precio tiempo real | IBKR Bridge → IB Gateway → YM futuros | $0 |
+| Datos mercado | CBOT Real-Time suscripción IBKR | $1.55/mes |
+| Análisis IA | Claude Sonnet (1 llamada/sesión) | ~$0.004/sesión |
+| Deploy | Vercel (auto-deploy desde GitHub) | $0 |
+| **Total** | | **~$1.63/mes** |
 
 ---
 
-## Instrumentos
+## Instrumentos soportados
 
 | Campo | Funding Pips (principal) | IBKR (futuro) |
 |---|---|---|
@@ -50,12 +58,12 @@ Combina datos históricos de Massive API, precio en tiempo real de Interactive B
 | Plataforma | MT5 | IB Gateway |
 | Tamaño | 0.05 lotes | 1 contrato |
 | Valor/punto | $0.05 | $0.50 |
-| Stop loss máx. | 200 pts ($10) | 40 pts ($20) |
-| Take profit obj. | 400 pts ($20) | 80 pts ($40) |
+| Stop loss máx. | 200 pts = $10 | 40 pts = $20 |
+| Take profit obj. | 400 pts = $20 | 80 pts = $40 |
 | Pérdida máx./día | $20 | $20 |
 | Objetivo/día | $40 | $40 |
 
-> **Los precios de YM y MYM son idénticos** — los niveles que da la app son válidos para ambos instrumentos sin conversión.
+> **Los precios de YM y MYM son idénticos** — los niveles de la app son válidos para ambos sin conversión.
 
 ---
 
@@ -65,26 +73,28 @@ Combina datos históricos de Massive API, precio en tiempo real de Interactive B
 App Vercel (Next.js)  ←→  Claude AI (análisis contexto)
         ↓
 Tu navegador (Mac)
-        ↓ fetch localhost:3001
+        ↓ fetch localhost:3001 cada 20s
 IBKR Bridge (~/ibkr-bridge/server.js)
+  · Buffer 100 precios en memoria
+  · removeListener() tras cada petición (sin memory leaks)
+  · Auto-reconexión si IB Gateway se desconecta
         ↓ TWS API puerto 4001
-IB Gateway (Mac)
+IB Gateway (Mac, modo LIVE)
         ↓
-Servidores IBKR → precio real YM/MYM
+Servidores IBKR → precio real YM Jun2026 (conId 793356190)
 ```
-
-La app de Vercel sirve el HTML/JS. Todas las llamadas a `localhost:3001` las hace **tu navegador desde tu Mac**, no desde Vercel.
 
 ---
 
-## Instalación y setup
+## Setup inicial
 
 ### Requisitos
 - Node.js ≥ 18
-- IB Gateway instalado (ver abajo)
-- Cuenta Interactive Brokers con suscripción CBOT Real-Time ($1.55/mes)
+- IB Gateway instalado (versión Stable, macOS Apple Silicon)
+- Cuenta Interactive Brokers live con suscripción CBOT Real-Time ($1.55/mes)
+- 2FA activado con Authy
 
-### 1. Clonar e instalar app
+### 1. Clonar e instalar
 
 ```bash
 git clone https://github.com/jcarpio/dj-trading-advisor.git
@@ -104,34 +114,45 @@ cp .env.example .env.local
 ```bash
 mkdir ~/ibkr-bridge
 cd ~/ibkr-bridge
-# Copiar server.js y package.json
+# Copiar server.js y package.json desde el repo
 npm install @stoqey/ib
 ```
 
 ### 4. Configurar IB Gateway
 
-1. Descargar IB Gateway Stable desde ibkr.com (versión macOS Apple Silicon)
-2. Login → **IB API** + **Live Trading** → puerto 4001
+1. Descargar IB Gateway Stable → ibkr.com → macOS Apple Silicon
+2. Login → **IB API** + **Live Trading**
 3. Configure → API → Settings:
-   - Read-Only API: ☐ (desactivado)
-   - Socket port: 4001
+   - Read-Only API: ☐ desactivado
+   - Socket port: **4001**
    - Allow connections from localhost only: ✓
+
+### 5. Configurar Portal IBKR
+
+- Configuración → Suscripciones a datos de mercado → activar **CBOT Real-Time (no profesional, nivel 1)**
+- Configuración → Acuse de recibo de la API de datos de mercado → **firmar**
 
 ---
 
 ## Flujo diario de uso
 
 ```bash
-# 1. Abrir IB Gateway → Login → esperar 3 líneas verdes
+# 1. Abrir IB Gateway
+#    → Login → código Authy → esperar 3 líneas verdes
 
-# 2. Arrancar bridge
-cd ~/ibkr-bridge && node server.js
+# 2. Arrancar bridge (caffeinate evita que el Mac entre en reposo)
+cd ~/ibkr-bridge
+caffeinate -i node server.js
 
 # 3. Verificar conexión
 curl http://localhost:3001/status
 curl "http://localhost:3001/price?symbol=YM"
+# Debe devolver: {"symbol":"YM","bid":...,"ask":...,"last":...}
 
-# 4. Abrir app en Vercel
+# 4. Abrir app
+#    Vercel: https://tu-app.vercel.app
+#    Local:  cd ~/dj-trading-advisor && npm run dev → localhost:3000
+
 # 5. Analizar contexto → Iniciar monitorización
 # 6. Esperar señal → ejecutar en MT5 (Funding Pips)
 # 7. Registrar resultado en la app
@@ -139,15 +160,14 @@ curl "http://localhost:3001/price?symbol=YM"
 
 ---
 
-## Costes mensuales
+## Mensajes de estado del bridge
 
-| Concepto | Coste |
+| Mensaje | Significado |
 |---|---|
-| Massive API | $0 |
-| IBKR CBOT Real-Time | $1.55 |
-| Claude AI (~20 sesiones × $0.004) | ~$0.08 |
-| Vercel hosting | $0 |
-| **Total** | **~$1.63/mes** |
+| `✅ Contexto obtenido — Señal: SELL` | Análisis completado |
+| `📡 US30 45.310 pts · IBKR · 11:30:00` | Poll con precio real |
+| `🕐 Mercado cerrado · Último H:46502 L:45272` | Bridge activo pero sin precio (fin de semana) |
+| `✗ IBKR Bridge no responde` | `node server.js` no está corriendo |
 
 ---
 
@@ -157,17 +177,18 @@ curl "http://localhost:3001/price?symbol=YM"
 conId 793356190 = YM Jun 2026  ← ACTIVO
 conId 815824220 = YM Sep 2026
 conId 840227352 = YM Dic 2026
+conId 866514740 = YM Mar 2027
 ```
 
-Actualizar `YM_CONID` en `~/ibkr-bridge/server.js` cuando ruede el contrato (junio 2026).
+Actualizar `YM_CONID` en `~/ibkr-bridge/server.js` cuando ruede el contrato (junio 2026 → cambiar a 815824220).
 
 ---
 
 ## Pendiente de implementar
 
-- [ ] Botón de ejecución automática de órdenes en IBKR (MYM bracket order)
+- [ ] Botón ejecución automática de órdenes en IBKR (MYM bracket order con SL+TP)
 - [ ] Obtener conId de MYM para ejecución directa
-- [ ] Stop loss y take profit automáticos al ejecutar
+- [ ] Parámetros de riesgo MYM: 1 contrato, SL 40 pts = $20 (~2% de €1.000)
 
 ---
 
