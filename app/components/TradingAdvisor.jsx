@@ -455,7 +455,7 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
     setPollCount(0);
     setPhase("monitoring");
     setNextPoll(20);
-    setLog(prev => [{ type: "info", icon: "▶", text: "Monitorización iniciada · Fuente: IBKR Bridge (localhost:3001) · poll cada 60s", time: new Date().toLocaleTimeString("es-ES") }, ...prev]);
+    setLog(prev => [{ type: "info", icon: "▶", text: "Monitorización iniciada · Fuente: IBKR Bridge (localhost:3001) · poll cada 20s", time: new Date().toLocaleTimeString("es-ES") }, ...prev]);
 
     const poll = async () => {
       try {
