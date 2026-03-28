@@ -626,7 +626,14 @@ Responde:
 
         addLog(entries);
       } catch (e) {
-        addLog({ type: "danger", icon: "✗", text: `Error IBKR Bridge: ${e.message}` });
+        const msg = e.message || "";
+        if (msg.includes("Failed to fetch") || msg.includes("ERR_CONNECTION_REFUSED") || msg.includes("NetworkError")) {
+          addLog({ type: "danger", icon: "✗", text: "IBKR Bridge no responde. Asegúrate de que 'node server.js' está corriendo en ~/ibkr-bridge" });
+        } else if (msg.includes("timed out") || msg.includes("signal")) {
+          addLog({ type: "warn", icon: "🕐", text: "Mercado cerrado o sin actividad · Bridge conectado pero sin ticks de precio" });
+        } else {
+          addLog({ type: "danger", icon: "✗", text: `Error IBKR Bridge: ${msg}` });
+        }
       }
     };
 
