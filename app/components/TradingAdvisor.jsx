@@ -560,13 +560,8 @@ Responde:
         const ibData = await ibRes.json();
 
         if (!ibData.last || ibData.last <= 0) {
-          // El bridge responde pero sin precio — mercado cerrado o fuera de horario
-          const hasMarketData = ibData.high || ibData.low || ibData.volume;
-          if (hasMarketData) {
-            addLog({ type: "warn", icon: "🕐", text: `Mercado cerrado · Último H:${ibData.high} L:${ibData.low} · Vol:${(ibData.volume||0).toLocaleString()} · Reabre domingo 23:00 Madrid` });
-          } else {
-            addLog({ type: "danger", icon: "✗", text: "IBKR Bridge no responde. Asegúrate de que 'node server.js' está corriendo en ~/ibkr-bridge" });
-          }
+          // Bridge responde pero sin precio — mercado cerrado
+          addLog({ type: "warn", icon: "🕐", text: `Mercado cerrado · Último H:${ibData.high || "—"} L:${ibData.low || "—"} · Vol:${(ibData.volume||0).toLocaleString()} · Reabre domingo 23:00 Madrid` });
           return;
         }
 
@@ -627,12 +622,10 @@ Responde:
         addLog(entries);
       } catch (e) {
         const msg = e.message || "";
-        if (msg.includes("Failed to fetch") || msg.includes("ERR_CONNECTION_REFUSED") || msg.includes("NetworkError")) {
-          addLog({ type: "danger", icon: "✗", text: "IBKR Bridge no responde. Asegúrate de que 'node server.js' está corriendo en ~/ibkr-bridge" });
-        } else if (msg.includes("timed out") || msg.includes("signal")) {
-          addLog({ type: "warn", icon: "🕐", text: "Mercado cerrado o sin actividad · Bridge conectado pero sin ticks de precio" });
+        if (msg.includes("timed out") || msg.includes("signal") || msg.includes("AbortError")) {
+          addLog({ type: "warn", icon: "🕐", text: "Mercado cerrado · Bridge conectado pero sin precio activo · Reabre domingo 23:00 Madrid" });
         } else {
-          addLog({ type: "danger", icon: "✗", text: `Error IBKR Bridge: ${msg}` });
+          addLog({ type: "danger", icon: "✗", text: "IBKR Bridge no responde. Asegúrate de que 'node server.js' está corriendo en ~/ibkr-bridge" });
         }
       }
     };
@@ -756,6 +749,18 @@ Responde:
           {phase === "monitoring" ? "⏹ Detener monitorización" : "② Iniciar monitorización 1min"}
         </button>
       </div>
+
+      {/* Re-analyze button — always visible when context exists */}
+      {context && (
+        <button onClick={reanalyze} disabled={busy} style={{
+          width: "100%", padding: "8px", fontSize: 11, marginBottom: "1rem",
+          cursor: busy ? "not-allowed" : "pointer",
+          background: busy ? "#111" : "#1a1a3e", color: busy ? "#444" : "#818cf8",
+          border: "0.5px solid #3730a3", borderRadius: 8, fontWeight: 600,
+        }}>
+          {loading?.includes("Re-anal") ? `⟳ ${loading}` : `🔄 Re-analizar con precio actual IBKR${priceHistory.length > 0 ? ` · ${priceHistory.length} precios acumulados` : ""}`}
+        </button>
+      )}
 
       {/* Session timer */}
       {phase === "monitoring" && (
