@@ -15,10 +15,6 @@ const PROX_THRESHOLD  = 30; // points to trigger "approaching" warning
 
 const diaToUS30 = (price) => Math.round(parseFloat(price) * 100);
 
-const TD_BASE = "https://api.twelvedata.com";
-const tdUrl   = (symbol, interval, outputsize, key) =>
-  `${TD_BASE}/time_series?symbol=${symbol}&interval=${interval}&outputsize=${outputsize}&apikey=${key}`;
-
 const MA_BASE = "https://api.massive.com";
 function daysAgo(n) {
   const d = new Date(); d.setDate(d.getDate() - n);
@@ -355,7 +351,6 @@ export default function TradingAdvisor() {
   // ── PHASE 1: Context ──────────────────────────────────────────────────────
   const getContext = useCallback(async () => {
     if (!massiveKey.trim()) { setError("Introduce tu API key de Massive."); return; }
-    if (!tdKey.trim())      { setError("Introduce tu API key de Twelve Data."); return; }
     setError(""); setLog([]); setLoading("Obteniendo contexto histórico (Massive)...");
 
     const tfs = [
@@ -443,11 +438,10 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
       addLog({ type: "danger", icon: "✗", text: `Error Claude: ${e.message}` });
       setLoading("");
     }
-  }, [massiveKey, tdKey, ticker, addLog]);
+  }, [massiveKey, ticker, addLog]);
 
   // ── PHASE 2: Monitor ──────────────────────────────────────────────────────
   const startMonitoring = useCallback(() => {
-    if (!tdKey.trim())  { setError("Introduce tu API key de Twelve Data."); return; }
     if (!context)       { setError("Obtén primero el contexto (Paso 1)."); return; }
     if (phase === "blocked") { setError("Sesión bloqueada por pérdida máxima."); return; }
 
@@ -533,14 +527,14 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
 
         addLog(entries);
       } catch (e) {
-        addLog({ type: "danger", icon: "✗", text: `Error Twelve Data: ${e.message}` });
+        addLog({ type: "danger", icon: "✗", text: `Error IBKR Bridge: ${e.message}` });
       }
     };
 
     poll();
     pollRef.current  = setInterval(poll, 60000);
     countRef.current = setInterval(() => setNextPoll(p => p <= 1 ? 60 : p - 1), 1000);
-  }, [tdKey, context, phase, ticker, checkRisk, addLog]);
+  }, [context, phase, ticker, checkRisk, addLog]);
 
   const stopMonitoring = () => {
     stopAll("");
@@ -618,10 +612,6 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
         <div>
           <label style={{ fontSize: 9, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" }}>Massive API Key</label>
           <input type="password" value={massiveKey} onChange={e => setMassiveKey(e.target.value)} placeholder="massive_key..." style={inputStyle} />
-        </div>
-        <div>
-          <label style={{ fontSize: 9, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" }}>Twelve Data Key</label>
-          <input type="password" value={tdKey} onChange={e => setTdKey(e.target.value)} placeholder="twelve_data_key..." style={inputStyle} />
         </div>
         <div>
           <label style={{ fontSize: 9, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" }}>Ticker</label>
