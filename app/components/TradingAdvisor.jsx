@@ -267,7 +267,8 @@ function LogEntry({ entry }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function TradingAdvisor() {
-  const [massiveKey, setMassiveKey] = useState("");
+  const [massiveKey,   setMassiveKey]   = useState("");
+  const [anthropicKey, setAnthropicKey] = useState("");
   const [ticker,     setTicker]     = useState("DIA");
 
   const [phase,      setPhase]      = useState("idle");
@@ -351,7 +352,8 @@ export default function TradingAdvisor() {
 
   // ── PHASE 1: Context ──────────────────────────────────────────────────────
   const getContext = useCallback(async () => {
-    if (!massiveKey.trim()) { setError("Introduce tu API key de Massive."); return; }
+    if (!massiveKey.trim())   { setError("Introduce tu API key de Massive."); return; }
+    if (!anthropicKey.trim()) { setError("Introduce tu API key de Anthropic."); return; }
     setError(""); setLog([]); setLoading("Obteniendo contexto histórico (Massive)...");
 
     const tfs = [
@@ -423,7 +425,7 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
     try {
       const res  = await fetch("/api/analyze", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, apiKey: anthropicKey }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -452,7 +454,7 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
       addLog({ type: "danger", icon: "✗", text: `Error Claude: ${e.message}` });
       setLoading("");
     }
-  }, [massiveKey, ticker, addLog]);
+  }, [massiveKey, anthropicKey, ticker, addLog]);
 
   // ── RE-ANALYZE with current IBKR price ────────────────────────────────────
   const reanalyze = useCallback(async () => {
@@ -511,7 +513,7 @@ Responde:
 
       const res  = await fetch("/api/analyze", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, apiKey: anthropicKey }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -532,7 +534,7 @@ Responde:
       setError(`Error re-análisis: ${e.message}`);
       setLoading("");
     }
-  }, [context, priceHistory, addLog]);
+  }, [context, priceHistory, anthropicKey, addLog]);
 
   // ── PHASE 2: Monitor ──────────────────────────────────────────────────────
   const startMonitoring = useCallback(() => {
@@ -707,10 +709,14 @@ Responde:
       )}
 
       {/* Keys */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 110px", gap: 8, marginBottom: "0.9rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 110px", gap: 8, marginBottom: "0.9rem" }}>
         <div>
           <label style={{ fontSize: 9, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" }}>Massive API Key</label>
           <input type="password" value={massiveKey} onChange={e => setMassiveKey(e.target.value)} placeholder="massive_key..." style={inputStyle} />
+        </div>
+        <div>
+          <label style={{ fontSize: 9, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" }}>Anthropic API Key</label>
+          <input type="password" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} placeholder="sk-ant-..." style={inputStyle} />
         </div>
         <div>
           <label style={{ fontSize: 9, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" }}>Ticker</label>
