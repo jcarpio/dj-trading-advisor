@@ -462,14 +462,14 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
     setPollCount(0);
     setPhase("monitoring");
     setNextPoll(60);
-    setLog(prev => [{ type: "info", icon: "▶", text: "Monitorización iniciada. Actualizando cada 60s desde IBKR Bridge (localhost:3001).", time: new Date().toLocaleTimeString("es-ES") }, ...prev]);
+    setLog(prev => [{ type: "info", icon: "▶", text: "Monitorización iniciada · Fuente: IBKR Bridge (localhost:3001) · poll cada 60s", time: new Date().toLocaleTimeString("es-ES") }, ...prev]);
 
     const poll = async () => {
       try {
         // Intenta IBKR Bridge primero (datos reales YM)
         // Obtener precio desde IBKR Bridge (localhost:3001)
         // Requiere que "node server.js" esté corriendo en ~/ibkr-bridge
-        const ibRes  = await fetch("http://localhost:3001/price?symbol=YM", { signal: AbortSignal.timeout(10000) });
+        const ibRes  = await fetch("http://localhost:3001/price?symbol=YM", { signal: AbortSignal.timeout(25000) });
         const ibData = await ibRes.json();
 
         if (!ibData.last || ibData.last <= 0) {
