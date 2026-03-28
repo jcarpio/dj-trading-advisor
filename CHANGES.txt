@@ -119,3 +119,80 @@ INICIAL
 - Panel de análisis con texto completo de Claude
 - Visor de JSON raw de Massive (expandible)
 - Prompt especializado en análisis técnico de futuros Dow Jones
+
+---
+
+v0.8.0 — 2026-03-27
+--------------------
+NUEVO — IBKR Bridge (carpeta ibkr-bridge/)
+- Servidor Node.js local que conecta IB Gateway con la app vía TWS API (puerto 4002/4001)
+- Endpoint /status: verifica conexión con IB Gateway
+- Endpoint /price?symbol=YM: precio en tiempo real del mini-Dow (YM Jun 2026, conId 793356190)
+- Endpoint /bars?period=1D&bar=1min: barras históricas (disponible en horario de mercado)
+- Soporte de delayed market data (reqMarketDataType 3) para paper trading sin suscripción
+- Tick types de delay correctos: 66=bid, 67=ask, 68=last, 72=high, 73=low, 74=volume
+- Contrato YM identificado por conId directo para máxima fiabilidad
+
+CONFIGURACIÓN IBKR COMPLETADA
+- Cuenta Interactive Brokers creada (U23712097)
+- Depósito EUR 1.000 via ING banca abierta
+- Suscripción CBOT Real-Time activada ($1.55/mes) — cubre futuros YM (mini-Dow)
+- IB Gateway 10.45 instalado en MacBook Pro M5
+- API configurada: IB API, puerto 4002 (paper) / 4001 (live), Read-Only desactivado
+- Contratos YM disponibles identificados:
+  * 20260618 → conId 793356190 (ACTIVO Jun 2026)
+  * 20260918 → conId 815824220 (Sep 2026)
+  * 20261218 → conId 840227352 (Dic 2026)
+
+RESULTADO VALIDADO
+- curl "http://localhost:3001/price?symbol=YM" devuelve:
+  {"symbol":"YM","bid":46212,"ask":46215,"last":46214,"high":46502,"low":46194,"volume":12633}
+- Datos con 15min delay en paper trading, tiempo real cuando se active cuenta live
+
+PENDIENTE
+- Cuenta live pendiente aprobación IBKR (24-48h)
+- Al aprobar: cambiar IB_PORT 4002→4001 y reqMarketDataType(3)→(1)
+- Adaptar app Vercel para usar bridge IBKR en lugar de Twelve Data
+
+---
+
+v0.9.0 — 2026-03-28
+--------------------
+NUEVO
+- IBKR Bridge como fuente única de datos en tiempo real (eliminado Twelve Data de monitorización)
+- Poll cada 20 segundos (antes 60s) — posible gracias a la rapidez del bridge IBKR (1-3s respuesta)
+- Conexión persistente con auto-reconexión al IB Gateway (reconecta automáticamente si se cae)
+- Mensajes de error mejorados: distingue errores IBKR de otros errores
+- Confirmado: MYM (Micro E-mini Dow, $0.50/punto) tiene precio idéntico al YM — válido para operar en Funding Pips
+
+ELIMINADO
+- Campo "Twelve Data Key" del formulario (ya no necesario)
+- Fallback a Twelve Data en la monitorización
+- analyzeCandle() — requería array de velas que IBKR precio no provee
+
+CORREGIDO
+- "bars is not defined" — la variable bars era de Twelve Data y quedó huérfana
+- "tdKey is not defined" — referencias residuales a Twelve Data eliminadas
+- "latest is not defined" — variable de scope de Twelve Data usada fuera de bloque
+- Build de Vercel fallaba por referencias a tdKey en el componente
+
+CONFIGURACIÓN IBKR COMPLETADA Y VALIDADA
+- Cuenta live aprobada y financiada con EUR 1.000
+- IB Gateway 10.45 corriendo en MacBook Pro M5 (puerto 4001, modo LIVE)
+- Bridge Node.js en ~/ibkr-bridge con conexión persistente
+- Precio YM Jun2026 (conId 793356190) funcionando con datos delayed
+- Validado: curl "http://localhost:3001/price?symbol=YM" devuelve bid/ask/last/high/low/volume en <3s
+- Validado: MYM precio idéntico al YM — sin conversión necesaria para operar en Funding Pips
+
+DECISIONES DE TRADING
+- Operativa principal: Funding Pips MT5 (US30 CFD, 0.05 lotes, SL 200 pts = $10)
+- Futura operativa IBKR: MYM (1 contrato, SL 40 pts = $20, ~2% de €1.000)
+- App sirve para ambas cuentas sin modificación — precio es el mismo
+- Botón de ejecución automática en IBKR pendiente de implementar (MYM conId por obtener)
+
+FLUJO DIARIO DE USO
+1. Abrir IB Gateway → Login → esperar "Connected"
+2. cd ~/ibkr-bridge && node server.js
+3. Abrir app en Vercel → Analizar contexto → Iniciar monitorización
+4. Esperar señal → ejecutar manualmente en Funding Pips MT5
+5. Registrar resultado (TP/SL/Manual) en la app
