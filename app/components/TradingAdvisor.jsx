@@ -505,9 +505,6 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
           if (p.type === "warn") playAlert("warn");
         });
 
-        // Candle patterns
-        const candles = analyzeCandle(bars);
-        candles.forEach(c => entries.push(c));
 
         // Entry signal check
         if (!alertRef.current && context?.levels?.entry) {
