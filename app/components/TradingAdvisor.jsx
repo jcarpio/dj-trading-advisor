@@ -455,7 +455,7 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
     setPollCount(0);
     setPhase("monitoring");
     setNextPoll(20);
-    setLog(prev => [{ type: "info", icon: "▶", text: "Monitorización iniciada · Fuente: IBKR Bridge (localhost:3001) · poll cada 20s", time: new Date().toLocaleTimeString("es-ES") }, ...prev]);
+    setLog(prev => [{ type: "info", icon: "▶", text: "Monitorización iniciada · Fuente: IBKR Bridge (localhost:3001) · poll cada 60s", time: new Date().toLocaleTimeString("es-ES") }, ...prev]);
 
     const poll = async () => {
       try {
@@ -466,7 +466,13 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
         const ibData = await ibRes.json();
 
         if (!ibData.last || ibData.last <= 0) {
-          addLog({ type: "danger", icon: "✗", text: "IBKR Bridge no responde. Asegúrate de que 'node server.js' está corriendo en ~/ibkr-bridge" });
+          // El bridge responde pero sin precio — mercado cerrado o fuera de horario
+          const hasMarketData = ibData.high || ibData.low || ibData.volume;
+          if (hasMarketData) {
+            addLog({ type: "warn", icon: "🕐", text: `Mercado cerrado · Último H:${ibData.high} L:${ibData.low} · Vol:${(ibData.volume||0).toLocaleString()} · Reabre domingo 23:00 Madrid` });
+          } else {
+            addLog({ type: "danger", icon: "✗", text: "IBKR Bridge no responde. Asegúrate de que 'node server.js' está corriendo en ~/ibkr-bridge" });
+          }
           return;
         }
 
