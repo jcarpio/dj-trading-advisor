@@ -1,22 +1,40 @@
-/**
- * API Route — proxy a IBKR Bridge local
- * La app llama a /api/ibkr?endpoint=price
- * Esta route llama a http://localhost:3001/price en el Mac del usuario
- *
- * IMPORTANTE: el IBKR Bridge debe estar corriendo en el mismo ordenador
- * que el navegador (localhost:3001). Esta route NO se usa en Vercel —
- * la llamada al bridge se hace directamente desde el navegador.
- */
+export async function POST(req) {
+  const { prompt, apiKey } = await req.json();
 
-export async function GET(req) {
-  const { searchParams } = new URL(req.url);
-  const endpoint = searchParams.get("endpoint") || "price";
+  if (!prompt) {
+    return Response.json({ error: "prompt requerido" }, { status: 400 });
+  }
+
+  // Use key from request body first, then fall back to env variable
+  const key = apiKey || process.env.ANTHROPIC_API_KEY;
+
+  if (!key) {
+    return Response.json({ error: "ANTHROPIC_API_KEY no configurada. Introduce tu API key de Anthropic en el formulario." }, { status: 500 });
+  }
 
   try {
-    const res  = await fetch(`http://localhost:3001/${endpoint}`, { signal: AbortSignal.timeout(10000) });
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      return Response.json({ error: `Anthropic API error: ${res.status} - ${err}` }, { status: res.status });
+    }
+
     const data = await res.json();
     return Response.json(data);
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 500 });
+    return Response.json({ error: e.message }, { status: 500 });
   }
 }
