@@ -272,7 +272,6 @@ function LogEntry({ entry }) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function TradingAdvisor() {
   const [massiveKey, setMassiveKey] = useState("");
-  const [tdKey,      setTdKey]      = useState("");
   const [ticker,     setTicker]     = useState("DIA");
 
   const [phase,      setPhase]      = useState("idle");
@@ -615,7 +614,7 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
       )}
 
       {/* Keys */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 110px", gap: 8, marginBottom: "0.9rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 110px", gap: 8, marginBottom: "0.9rem" }}>
         <div>
           <label style={{ fontSize: 9, color: "#555", display: "block", marginBottom: 3, textTransform: "uppercase" }}>Massive API Key</label>
           <input type="password" value={massiveKey} onChange={e => setMassiveKey(e.target.value)} placeholder="massive_key..." style={inputStyle} />
