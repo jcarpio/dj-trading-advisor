@@ -275,7 +275,8 @@ export default function TradingAdvisor() {
   const [loading,    setLoading]    = useState("");
   const [error,      setError]      = useState("");
 
-  const [livePrice,  setLivePrice]  = useState(null);
+  const [livePrice,    setLivePrice]    = useState(null);
+  const [priceHistory, setPriceHistory] = useState([]); // últimos 100 precios IBKR
   const [prevUS30,   setPrevUS30]   = useState(null);
   const [alertFired, setAlertFired] = useState(false);
   const [pollCount,  setPollCount]  = useState(0);
@@ -356,7 +357,7 @@ export default function TradingAdvisor() {
     const tfs = [
       { id: "1W", path: `/v2/aggs/ticker/${ticker}/range/1/week/${daysAgo(84)}/${TODAY}?adjusted=true&sort=asc&limit=12` },
       { id: "1D", path: `/v2/aggs/ticker/${ticker}/range/1/day/${daysAgo(30)}/${TODAY}?adjusted=true&sort=asc&limit=30` },
-      { id: "4H", path: `/v2/aggs/ticker/${ticker}/range/4/hour/${daysAgo(3)}/${TODAY}?adjusted=true&sort=asc&limit=20` },
+      { id: "1H", path: `/v2/aggs/ticker/${ticker}/range/1/hour/${daysAgo(2)}/${TODAY}?adjusted=true&sort=asc&limit=24` },
     ];
 
     const tfData = {};
@@ -382,6 +383,19 @@ export default function TradingAdvisor() {
       return `${id}: tendencia ${trend}, cierre $${last.c?.toFixed(2)} (US30 ~${diaToUS30(last.c)} pts), máx ${diaToUS30(Math.max(...hs))} pts, mín ${diaToUS30(Math.min(...ls))} pts, ${bars.length} barras`;
     };
 
+    // Include live IBKR price if available
+    let ibkrLine = "";
+    try {
+      const ibRes  = await fetch("http://localhost:3001/price?symbol=YM", { signal: AbortSignal.timeout(10000) });
+      const ibData = await ibRes.json();
+      if (ibData.last && ibData.last > 0) {
+        ibkrLine = `\nPRECIO ACTUAL EN TIEMPO REAL (IBKR YM): ${ibData.last} pts · Bid:${ibData.bid} Ask:${ibData.ask} · H:${ibData.high} L:${ibData.low} · Vol:${ibData.volume}`;
+        addLog({ type: "info", icon: "📡", text: `Precio IBKR incluido en análisis: ${ibData.last} pts` });
+      } else if (ibData.high) {
+        ibkrLine = `\nMERCADO CERRADO — Última sesión: H:${ibData.high} L:${ibData.low} Vol:${ibData.volume}`;
+      }
+    } catch {}
+
     const prompt = `Eres analista de CFDs. El trader opera US30/DJIA en MT5 con lotes 0.05 ($0.05/punto).
 
 PARÁMETROS DE RIESGO:
@@ -389,12 +403,12 @@ PARÁMETROS DE RIESGO:
 - Take profit obj: $20 por op (400 puntos US30)
 - Pérdida máx diaria: $20 | Objetivo diario: $40
 
-DATOS (DIA ETF, DIA×100 ≈ puntos US30):
-${Object.entries(tfData).map(([id, bars]) => summarize(bars, id)).join("\n")}
+DATOS HISTÓRICOS (DIA ETF, DIA×100 ≈ puntos US30):
+${Object.entries(tfData).map(([id, bars]) => summarize(bars, id)).join("\n")}${ibkrLine}
 
 Responde:
 1. Señal: BUY, SELL o HOLD (primera palabra).
-2. Tendencia macro (1W), operativa (1D), estructura (4H).
+2. Tendencia macro (1W), operativa (1D), estructura intraday (1H).
 3. Niveles clave en puntos US30:
    - Resistencias: R1, R2, R3
    - Soportes: S1, S2, S3
@@ -439,6 +453,86 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
       setLoading("");
     }
   }, [massiveKey, ticker, addLog]);
+
+  // ── RE-ANALYZE with current IBKR price ────────────────────────────────────
+  const reanalyze = useCallback(async () => {
+    if (!context) { setError("Obtén primero el contexto (Paso 1)."); return; }
+    setLoading("Re-analizando con precio actual IBKR...");
+    setError("");
+    try {
+      // Get current IBKR price
+      let ibkrLine = "Sin datos de precio en tiempo real";
+      try {
+        const ibRes  = await fetch("http://localhost:3001/price?symbol=YM", { signal: AbortSignal.timeout(10000) });
+        const ibData = await ibRes.json();
+        if (ibData.last && ibData.last > 0) {
+          ibkrLine = `Precio actual YM: ${ibData.last} pts · Bid:${ibData.bid} Ask:${ibData.ask} · H:${ibData.high} L:${ibData.low} · Vol:${ibData.volume}`;
+        }
+      } catch {}
+
+      // Summarize price history
+      const histSummary = priceHistory.length > 0
+        ? (() => {
+            const prices = priceHistory.map(p => p.price);
+            const pFirst = prices[0];
+            const pLast  = prices[prices.length - 1];
+            const pMax   = Math.max(...prices);
+            const pMin   = Math.min(...prices);
+            const trend  = pLast > pFirst ? "subiendo" : pLast < pFirst ? "bajando" : "lateral";
+            const series = priceHistory.slice(-20).map(p => p.price).join(", ");
+            return `${priceHistory.length} precios · Rango: ${pMin}–${pMax} pts · Tendencia: ${trend} (${pFirst}→${pLast})
+Últimos 20: ${series}`;
+          })()
+        : "Sin historial (monitorización no iniciada)";
+
+      const prompt = `Eres analista de CFDs. El trader opera US30/DJIA.
+
+ANÁLISIS PREVIO (datos históricos Massive):
+${context.analysis?.slice(0, 800) || "N/A"}
+
+PRECIO ACTUAL EN TIEMPO REAL (IBKR):
+${ibkrLine}
+
+HISTORIAL INTRADAY IBKR (poll cada 20s, últimos ~33 min):
+${histSummary}
+
+Con estos datos actualizados, revisa tu análisis anterior.
+Usa el historial para detectar momentum y tendencia intraday.
+¿Sigue siendo válida la entrada en ${context.levels?.entry} pts?
+
+Responde:
+1. Señal actualizada: BUY, SELL o HOLD (primera palabra)
+2. ¿Sigue válido el análisis previo? ¿Qué ha cambiado?
+3. Tendencia intraday según historial de precios.
+4. "Entrada: XXXXX" (puntos US30, entero)
+5. "Stop: XXXXX" (máx 200 pts)
+6. "Objetivo: XXXXX" (máx 400 pts)
+7. Invalidación actualizada.`;
+
+      const res  = await fetch("/api/analyze", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      const text   = data?.content?.map(b => b.text || "").join("") || "";
+      const signal = extractSignal(text);
+      const levels = extractLevels(text);
+
+      const ctx = { signal, levels, analysis: text, time: new Date().toISOString() };
+      setContext(ctx);
+      addLog([
+        { type: "info",   icon: "🔄", text: `Re-análisis completado — Señal: ${signal}` },
+        levels.entry ? { type: "info",   icon: "→",  text: `Entrada: ${levels.entry?.toLocaleString()} pts US30` } : null,
+        levels.sl    ? { type: "danger", icon: "🛑", text: `Stop loss: ${levels.sl?.toLocaleString()} pts` }       : null,
+        levels.tp    ? { type: "profit", icon: "💰", text: `Objetivo: ${levels.tp?.toLocaleString()} pts` }        : null,
+      ].filter(Boolean));
+      setLoading("");
+    } catch (e) {
+      setError(`Error re-análisis: ${e.message}`);
+      setLoading("");
+    }
+  }, [context, priceHistory, addLog]);
 
   // ── PHASE 2: Monitor ──────────────────────────────────────────────────────
   const startMonitoring = useCallback(() => {
@@ -489,6 +583,8 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
         setPrevUS30(prev);
         prevRef.current = us30;
         setPollCount(p => p + 1);
+        // Guardar en historial circular (máx 100 precios)
+        setPriceHistory(h => [...h.slice(-99), { price: us30, high, low, volume, time: timeStr }]);
 
         const entries = [];
 
@@ -590,7 +686,7 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
           )}
         </div>
         <p style={{ margin: 0, fontSize: 10, color: "#444" }}>
-          Contexto: Massive (1W·1D·4H) · Tiempo real: IBKR Bridge (YM) · US30 CFD · MT5
+          Contexto: Massive (1W·1D·1H) · Tiempo real: IBKR Bridge (YM) · US30 CFD · MT5
         </p>
       </div>
 
@@ -673,7 +769,7 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
             <Stat label="US30 equiv." value={`${livePrice.us30.toLocaleString()}`} color="#4ade80" sub="puntos" />
             <Stat label="Vol. YM"     value={livePrice.volume ? livePrice.volume.toLocaleString() : "—"} />
             <Stat label="Rango vela"  value={`${livePrice.low}–${livePrice.high}`} color="#888" />
-            <Stat label="Última vela" value={formatTime(livePrice.time)} color="#555" />
+            <Stat label={`Historial · ${priceHistory.length}/100`} value={formatTime(livePrice.time)} color={priceHistory.length >= 10 ? "#4ade80" : "#555"} />
           </div>
         </div>
       )}
