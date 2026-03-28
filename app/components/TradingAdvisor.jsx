@@ -279,7 +279,7 @@ export default function TradingAdvisor() {
   const [prevUS30,   setPrevUS30]   = useState(null);
   const [alertFired, setAlertFired] = useState(false);
   const [pollCount,  setPollCount]  = useState(0);
-  const [nextPoll,   setNextPoll]   = useState(60);
+  const [nextPoll,   setNextPoll]   = useState(20);
   const [log,        setLog]        = useState([]);
 
   const [session,    setSession]    = useState(() => loadSession() || newSession());
@@ -454,7 +454,7 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
     setAlertFired(false);
     setPollCount(0);
     setPhase("monitoring");
-    setNextPoll(60);
+    setNextPoll(20);
     setLog(prev => [{ type: "info", icon: "▶", text: "Monitorización iniciada · Fuente: IBKR Bridge (localhost:3001) · poll cada 60s", time: new Date().toLocaleTimeString("es-ES") }, ...prev]);
 
     const poll = async () => {
@@ -529,8 +529,8 @@ Usa solo números enteros para los niveles. El trader mirará el gráfico 1min d
     };
 
     poll();
-    pollRef.current  = setInterval(poll, 60000);
-    countRef.current = setInterval(() => setNextPoll(p => p <= 1 ? 60 : p - 1), 1000);
+    pollRef.current  = setInterval(poll, 20000);
+    countRef.current = setInterval(() => setNextPoll(p => p <= 1 ? 20 : p - 1), 1000);
   }, [context, phase, ticker, checkRisk, addLog]);
 
   const stopMonitoring = () => {
